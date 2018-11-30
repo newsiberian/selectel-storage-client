@@ -1,14 +1,17 @@
 {
   "name": "selectel-storage-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node.js client for Selectel Storage",
   "main": "dist/bundle.js",
   "scripts": {
     "bundle": "rollup -c",
-    "compile": "tsc",
+    "build": "tsc",
+    "clean": "rimraf lib/* && rimraf coverage/*",
     "pre-commit": "lint-staged",
-    "prepublish": "compile",
-    "test": "jest --notify"
+    "postbuild": "npm run bundle",
+    "prebuild": "npm run clean",
+    "prepublishOnly": "npm run build",
+    "test": "jest"
   },
   "keywords": [
     "selectel"
@@ -37,6 +40,7 @@
     "jest": "23.6.0",
     "lint-staged": "8.1.0",
     "prettier": "1.15.2",
+    "rimraf": "^2.6.2",
     "rollup": "0.67.3",
     "ts-jest": "23.10.5",
     "ts-node": "7.0.1",
