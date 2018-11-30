@@ -108,6 +108,18 @@ export default class SelectelStorageClient {
     }).catch(handleError);
   }
 
+  public getContainerInfo(name: string) {
+    if (typeof name !== 'string' || !name.length) {
+      throw new Error('Container name missed');
+    }
+
+    return this.makeRequest({
+      uri: `${this.storageUrl}/${name}`,
+      method: 'GET',
+      resolveWithFullResponse: true,
+    }).catch(handleError);
+  }
+
   private authorize() {
     return rp({
       uri: `${baseUri()}${this.getAuthorizationPath()}`,

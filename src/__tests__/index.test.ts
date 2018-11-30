@@ -150,4 +150,34 @@ describe('Methods', () => {
       }
     });
   });
+
+  describe('getContainerInfo', () => {
+    it('should receive status 204', () => {
+      expect.assertions(2);
+      const name = faker.name.firstName();
+      return client
+        .createContainer({
+          name,
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(201);
+
+          return client.getContainerInfo(name);
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(204);
+        });
+    });
+
+    it('should throw when container name missed', () => {
+      expect.assertions(1);
+      try {
+        client.getContainerInfo();
+      } catch (err) {
+        expect(err).toEqual(new Error('Container name missed'));
+      }
+    });
+  });
 });
