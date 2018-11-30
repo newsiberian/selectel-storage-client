@@ -3,7 +3,7 @@ export default {
   output: {
     file: 'dist/bundle.js',
     format: 'cjs',
-    name: 'selectel-storage-client',
+    name: 'SelectelStorageClient',
     sourcemap: true,
   },
 };

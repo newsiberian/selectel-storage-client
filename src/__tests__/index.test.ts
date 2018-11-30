@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import faker from 'faker';
+import path from 'path';
 
 import SelectelStorageClient from '../';
 
@@ -111,7 +112,7 @@ describe('Methods', () => {
       expect.assertions(2);
       return client
         .createContainer({
-          name: faker.name.firstName(),
+          container: faker.name.firstName(),
         })
         .then(response => {
           expect(response).toBeDefined();
@@ -123,7 +124,7 @@ describe('Methods', () => {
       expect.assertions(2);
       return client
         .createContainer({
-          name: faker.name.firstName(),
+          container: faker.name.firstName(),
           type: 'private',
         })
         .then(response => {
@@ -154,16 +155,18 @@ describe('Methods', () => {
   describe('getContainerInfo', () => {
     it('should receive status 204', () => {
       expect.assertions(2);
-      const name = faker.name.firstName();
+      const container = faker.name.firstName();
       return client
         .createContainer({
-          name,
+          container,
         })
         .then(response => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
 
-          return client.getContainerInfo(name);
+          return client.getContainerInfo({
+            container,
+          });
         })
         .then(response => {
           expect(response).toBeDefined();
@@ -178,6 +181,90 @@ describe('Methods', () => {
       } catch (err) {
         expect(err).toEqual(new Error('Container name missed'));
       }
+    });
+  });
+
+  describe('getFiles', () => {
+    let container;
+
+    beforeAll(() => {
+      container = faker.name.firstName();
+
+      return client
+        .createContainer({
+          container,
+        })
+        .then(() => {
+          return Promise.all(
+            [1, 2, 3].map(i =>
+              client.upload({
+                container,
+                file: path.resolve(__dirname, 'image.png'),
+                fileName: `image-${i}.png`,
+              }),
+            ),
+          );
+        });
+    });
+
+    it('should receive files from container', () => {
+      expect.assertions(1);
+      return client.getFiles({ container }).then(result => {
+        expect(result.files).toHaveLength(3);
+      });
+    });
+
+    it('should receive files in json', () => {
+      expect.assertions(1);
+      return client.getFiles({ container, format: 'json' }).then(result => {
+        expect(result.files).toHaveLength(3);
+      });
+    });
+
+    it('should receive files from marker', () => {
+      expect.assertions(1);
+      return client
+        .getFiles({ container, marker: 'image-1.png' })
+        .then(result => {
+          expect(result.files).toHaveLength(2);
+          expect(result.files).toEqual(
+            expect.arrayContaining(['image-2.png', 'image-3.png']),
+          );
+        });
+    });
+
+    it('should receive limited number of files', () => {
+      expect.assertions(1);
+      return client.getFiles({ container, limit: 1 }).then(result => {
+        expect(result.files).toHaveLength(1);
+      });
+    });
+  });
+
+  describe('upload', () => {
+    let container;
+
+    beforeAll(() => {
+      container = faker.name.firstName();
+
+      return client.createContainer({
+        container,
+      });
+    });
+
+    it('should upload file from fs', () => {
+      expect.assertions(2);
+
+      return client
+        .upload({
+          container,
+          file: path.resolve(__dirname, 'image.png'),
+          fileName: 'image.png',
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(201);
+        });
     });
   });
 });

@@ -1,4 +1,8 @@
+import fs from 'fs';
+import util from 'util';
 import rp from 'request-promise-native';
+
+const readFile = util.promisify(fs.readFile);
 
 type Protocol = 1 | 2 | 3;
 type ContainerType = 'public' | 'private';
@@ -62,6 +66,10 @@ export default class SelectelStorageClient {
     }).catch(handleError);
   }
 
+  //
+  // Container operations
+  //
+
   /**
    * Request could be of two types: with json and with string
    * @param {boolean} returnJson
@@ -85,20 +93,14 @@ export default class SelectelStorageClient {
   }
 
   public createContainer(params: {
-    name: string;
+    container: string;
     type?: ContainerType;
     metadata?: string;
   }) {
-    if (!params) {
-      throw new Error('Params missed');
-    }
-
-    if (typeof params.name !== 'string' || !params.name.length) {
-      throw new Error('New container name must be provided');
-    }
+    validateParams(params);
 
     return this.makeRequest({
-      uri: `${this.storageUrl}/${params.name}`,
+      uri: `${this.storageUrl}/${params.container}`,
       method: 'PUT',
       headers: {
         'X-Container-Meta-Type': params.type || 'public',
@@ -108,16 +110,114 @@ export default class SelectelStorageClient {
     }).catch(handleError);
   }
 
-  public getContainerInfo(name: string) {
-    if (typeof name !== 'string' || !name.length) {
-      throw new Error('Container name missed');
-    }
+  public getContainerInfo(params: { container: string }) {
+    validateParams(params);
 
     return this.makeRequest({
-      uri: `${this.storageUrl}/${name}`,
+      uri: `${this.storageUrl}/${params.container}`,
       method: 'GET',
       resolveWithFullResponse: true,
     }).catch(handleError);
+  }
+
+  // TODO: finish
+  public getFiles(params: {
+    container: string;
+    limit?: number;
+    marker?: string;
+    prefix?: string;
+    delimiter?: string;
+    format?: 'json' | 'xml';
+  }) {
+    validateParams(params);
+    const qs = {} as {
+      limit?: number;
+      marker?: string;
+      prefix?: string;
+      delimiter?: string;
+      format?: 'json' | 'xml';
+    };
+
+    if (typeof params.format === 'string') {
+      qs.format = params.format;
+    }
+
+    if (typeof params.limit === 'number') {
+      qs.limit = params.limit;
+    }
+
+    if (typeof params.marker === 'string') {
+      qs.marker = params.marker;
+    }
+
+    if (typeof params.prefix === 'string') {
+      qs.prefix = params.prefix;
+    }
+
+    if (typeof params.delimiter === 'string') {
+      qs.delimiter = params.delimiter;
+    }
+
+    return this.makeRequest({
+      uri: `${this.storageUrl}/${params.container}`,
+      method: 'GET',
+      qs,
+      resolveWithFullResponse: true,
+    })
+      .then(response => {
+        const files = parseFiles(response.body, params.format);
+
+        return {
+          files,
+          filesAmount: +response.headers['x-container-object-count'],
+          containerSize: +response.headers['x-container-bytes-used'],
+          containerType: response.headers['x-container-meta-type'],
+        };
+      })
+      .catch(handleError);
+  }
+
+  //
+  // Single file operations
+  //
+
+  /**
+   * Upload single file to Selectel storage
+   * @param {object} params
+   * @param {Buffer | string} params.file - file's buffer or local path
+   * @returns {Promise<void>}
+   */
+  public upload(params: {
+    container: string;
+    file: Buffer | string;
+    fileName: string;
+    deleteAt?: number;
+    lifetime?: number;
+    etag?: string;
+    metadata?: string;
+  }) {
+    return Promise.resolve()
+      .then(() => {
+        if (typeof params.file === 'string') {
+          return readFile(params.file);
+        }
+        return params.file;
+      })
+      .then(buffer => {
+        return this.makeRequest({
+          uri: `${this.storageUrl}/${params.container}/${params.fileName}`,
+          method: 'PUT',
+          headers: {
+            'X-Delete-At': params.deleteAt,
+            'X-Delete-After': params.lifetime,
+            Etag: params.etag,
+            'X-Object-Meta': params.metadata,
+          },
+          body: buffer,
+          resolveWithFullResponse: true,
+        });
+      })
+      .catch(handleError);
   }
 
   private authorize() {
@@ -248,4 +348,27 @@ export default class SelectelStorageClient {
 
 function handleError(err) {
   throw new Error(err);
+}
+
+function validateParams(params) {
+  if (!params) {
+    throw new Error('Params missed');
+  }
+
+  if (typeof params.container !== 'string' || !params.container.length) {
+    throw new Error('Container name missed');
+  }
+}
+
+function parseFiles(body, format) {
+  switch (format) {
+    case 'json':
+      return JSON.parse(body);
+    case 'xml':
+      // I don't think we need to support xml
+      throw new Error('Oops, xml is not currently supported');
+    default:
+      // remove last \n and split
+      return body.trim().split('\n');
+  }
 }
