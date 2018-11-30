@@ -120,7 +120,6 @@ export default class SelectelStorageClient {
     }).catch(handleError);
   }
 
-  // TODO: finish
   public getFiles(params: {
     container: string;
     limit?: number;
@@ -187,7 +186,7 @@ export default class SelectelStorageClient {
    * @param {Buffer | string} params.file - file's buffer or local path
    * @returns {Promise<void>}
    */
-  public upload(params: {
+  public uploadFile(params: {
     container: string;
     file: Buffer | string;
     fileName: string;
@@ -196,6 +195,8 @@ export default class SelectelStorageClient {
     etag?: string;
     metadata?: string;
   }) {
+    validateParams(params);
+
     return Promise.resolve()
       .then(() => {
         if (typeof params.file === 'string') {
@@ -218,6 +219,29 @@ export default class SelectelStorageClient {
         });
       })
       .catch(handleError);
+  }
+
+  public deleteFiles(params: { container: string; files: string[] }) {
+    validateParams(params);
+    if (!Array.isArray(params.files) || !params.files.length) {
+      throw new Error('Files missed');
+    }
+
+    const fullPaths = params.files.map(file => `${params.container}/${file}`);
+    const body = fullPaths.join('\n');
+
+    return this.makeRequest({
+      uri: this.storageUrl,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      qs: {
+        'bulk-delete': true,
+      },
+      body,
+      resolveWithFullResponse: true,
+    });
   }
 
   private authorize() {
@@ -315,7 +339,6 @@ export default class SelectelStorageClient {
             },
           }),
           resolveWithFullResponse: true,
-          // json: true,
         };
     }
   }

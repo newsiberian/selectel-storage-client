@@ -197,7 +197,7 @@ describe('Methods', () => {
         .then(() => {
           return Promise.all(
             [1, 2, 3].map(i =>
-              client.upload({
+              client.uploadFile({
                 container,
                 file: path.resolve(__dirname, 'image.png'),
                 fileName: `image-${i}.png`,
@@ -241,7 +241,7 @@ describe('Methods', () => {
     });
   });
 
-  describe('upload', () => {
+  describe('uploadFile', () => {
     let container;
 
     beforeAll(() => {
@@ -256,7 +256,7 @@ describe('Methods', () => {
       expect.assertions(2);
 
       return client
-        .upload({
+        .uploadFile({
           container,
           file: path.resolve(__dirname, 'image.png'),
           fileName: 'image.png',
@@ -264,6 +264,43 @@ describe('Methods', () => {
         .then(response => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
+        });
+    });
+  });
+
+  describe('deleteFiles', () => {
+    let container;
+
+    beforeAll(() => {
+      container = faker.name.firstName();
+
+      return client
+        .createContainer({
+          container,
+        })
+        .then(() => {
+          return Promise.all(
+            [1, 2, 3].map(i =>
+              client.uploadFile({
+                container,
+                file: path.resolve(__dirname, 'image.png'),
+                fileName: `image-${i}.png`,
+              }),
+            ),
+          );
+        });
+    });
+
+    it('should delete files', () => {
+      expect.assertions(2);
+      return client
+        .deleteFiles({
+          container,
+          files: ['image-1.png', 'image-2.png', 'image-3.png'],
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(200);
         });
     });
   });
