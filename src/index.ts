@@ -1,8 +1,7 @@
 import fs from 'fs';
-import util from 'util';
+import Stream from 'stream';
+import request from 'request';
 import rp from 'request-promise-native';
-
-const readFile = util.promisify(fs.readFile);
 
 type Protocol = 1 | 2 | 3;
 type ContainerType = 'public' | 'private';
@@ -188,7 +187,7 @@ export default class SelectelStorageClient {
    */
   public uploadFile(params: {
     container: string;
-    file: Buffer | string;
+    file: Buffer | Stream | string;
     fileName: string;
     deleteAt?: number;
     lifetime?: number;
@@ -198,25 +197,40 @@ export default class SelectelStorageClient {
     validateParams(params);
 
     return Promise.resolve()
-      .then(() => {
-        if (typeof params.file === 'string') {
-          return readFile(params.file);
-        }
-        return params.file;
-      })
-      .then(buffer => {
-        return this.makeRequest({
-          uri: `${this.storageUrl}/${params.container}/${params.fileName}`,
-          method: 'PUT',
-          headers: {
-            'X-Delete-At': params.deleteAt,
-            'X-Delete-After': params.lifetime,
-            Etag: params.etag,
-            'X-Object-Meta': params.metadata,
+      .then(
+        (): Stream | Promise<Stream> => {
+          if (typeof params.file === 'string') {
+            // return readFile(params.file);
+            return fs.createReadStream(params.file);
+          } else if (params.file instanceof Stream) {
+            return params.file;
+          } else if (params.file instanceof Buffer) {
+            // @thanks to https://stackoverflow.com/a/44091532/7252759
+            const readable = new Stream.Readable();
+            // _read is required but you can noop it
+            readable._read = () => null;
+            readable.push(params.file);
+            readable.push(null);
+            return readable;
+          }
+        },
+      )
+      .then(stream => {
+        return this.makeRequest(
+          {
+            uri: `${this.storageUrl}/${params.container}/${params.fileName}`,
+            method: 'PUT',
+            headers: {
+              'X-Delete-At': params.deleteAt,
+              'X-Delete-After': params.lifetime,
+              Etag: params.etag,
+              'X-Object-Meta': params.metadata,
+            },
+            resolveWithFullResponse: true,
           },
-          body: buffer,
-          resolveWithFullResponse: true,
-        });
+          true,
+          stream,
+        );
       })
       .catch(handleError);
   }
@@ -343,7 +357,7 @@ export default class SelectelStorageClient {
     }
   }
 
-  private makeRequest(params) {
+  private makeRequest(params, isStream = false, stream?: Stream): Promise<any> {
     return Promise.resolve()
       .then(() => {
         if (this.expireAuthToken && this.expireAuthToken <= Date.now()) {
@@ -356,15 +370,19 @@ export default class SelectelStorageClient {
       })
       .then(() => {
         const { uri, ...rest } = params;
-
-        return rp({
+        const options = {
           ...rest,
           uri: typeof uri === 'string' ? uri : this.storageUrl,
           headers: {
             ...params.headers,
             'X-Auth-Token': this.token,
           },
-        });
+        };
+
+        if (isStream) {
+          return stream.pipe(request(options));
+        }
+        return rp(options);
       });
   }
 }

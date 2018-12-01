@@ -1,10 +1,13 @@
 import dotenv from 'dotenv';
 import faker from 'faker';
+import fs from 'fs';
 import path from 'path';
+import util from 'util';
 
 import SelectelStorageClient from '../';
 
 dotenv.config();
+const readFile = util.promisify(fs.readFile);
 
 describe('Authorization', () => {
   it('should receive token via protocol v1.0 authorization', () => {
@@ -69,7 +72,7 @@ describe('Methods', () => {
 
   describe('getAccountInfo', () => {
     it('should return status 204', () => {
-      expect.assertions(1);
+      expect.assertions(2);
       return client.getAccountInfo().then(response => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(204);
@@ -79,7 +82,7 @@ describe('Methods', () => {
 
   describe('getInfo', () => {
     it('should return status 204', () => {
-      expect.assertions(1);
+      expect.assertions(2);
       return client.getInfo().then(response => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(204);
@@ -147,14 +150,14 @@ describe('Methods', () => {
       try {
         client.createContainer({});
       } catch (err) {
-        expect(err).toEqual(new Error('New container name must be provided'));
+        expect(err).toEqual(new Error('Container name missed'));
       }
     });
   });
 
   describe('getContainerInfo', () => {
     it('should receive status 204', () => {
-      expect.assertions(2);
+      expect.assertions(4);
       const container = faker.name.firstName();
       return client
         .createContainer({
@@ -177,7 +180,7 @@ describe('Methods', () => {
     it('should throw when container name missed', () => {
       expect.assertions(1);
       try {
-        client.getContainerInfo();
+        client.getContainerInfo({});
       } catch (err) {
         expect(err).toEqual(new Error('Container name missed'));
       }
@@ -222,7 +225,7 @@ describe('Methods', () => {
     });
 
     it('should receive files from marker', () => {
-      expect.assertions(1);
+      expect.assertions(2);
       return client
         .getFiles({ container, marker: 'image-1.png' })
         .then(result => {
@@ -259,6 +262,40 @@ describe('Methods', () => {
         .uploadFile({
           container,
           file: path.resolve(__dirname, 'image.png'),
+          fileName: 'image.png',
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(201);
+        });
+    });
+
+    it('should upload file from buffer', async () => {
+      expect.assertions(2);
+
+      const buffer = await readFile(path.resolve(__dirname, 'image.png'));
+
+      return client
+        .uploadFile({
+          container,
+          file: buffer,
+          fileName: 'image.png',
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(201);
+        });
+    });
+
+    it('should upload file from stream', async () => {
+      expect.assertions(2);
+
+      const stream = fs.createReadStream(path.resolve(__dirname, 'image.png'));
+
+      return client
+        .uploadFile({
+          container,
+          file: stream,
           fileName: 'image.png',
         })
         .then(response => {

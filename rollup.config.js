@@ -4,6 +4,5 @@ export default {
     file: 'lib/bundle.js',
     format: 'cjs',
     name: 'SelectelStorageClient',
-    sourcemap: true,
   },
 };

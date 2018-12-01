@@ -1,12 +1,12 @@
 {
   "name": "selectel-storage-client",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Node.js client for Selectel Storage",
-  "main": "dist/bundle.js",
+  "main": "lib/bundle.js",
   "scripts": {
     "bundle": "rollup -c",
     "build": "tsc",
-    "clean": "rimraf lib/* && rimraf coverage/*",
+    "clean": "rimraf lib/* && rimraf dist/* && rimraf coverage/*",
     "pre-commit": "lint-staged",
     "postbuild": "npm run bundle",
     "prebuild": "npm run clean",
@@ -24,6 +24,10 @@
   },
   "author": "Akiyakov Denis<newsiberian2015@yandex.ru>",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/newsiberian/selectel-storage-client/issues"
+  },
+  "homepage": "https://github.com/newsiberian/selectel-storage-client#readme",
   "dependencies": {
     "request": "^2.88.0",
     "request-promise-native": "^1.0.5"
