@@ -3,7 +3,6 @@
 .env
 covarage/
 node_modules/
-dist/
 src/
 rollup.config.js
 tsconfig.json

@@ -8,7 +8,7 @@ type ContainerType = 'public' | 'private';
 
 const baseUri = (key = 'api') => `https://${key}.selcdn.ru`;
 
-export default class SelectelStorageClient {
+export class SelectelStorageClient {
   private readonly accountId: string;
   private readonly userId: string;
   private readonly password: string;

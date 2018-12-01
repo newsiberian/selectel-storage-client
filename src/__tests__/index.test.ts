@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import util from 'util';
 
-import SelectelStorageClient from '../';
+import { SelectelStorageClient } from '../';
 
 dotenv.config();
 const readFile = util.promisify(fs.readFile);
