@@ -20,7 +20,7 @@ describe('Authorization', () => {
 
     return client.getAccountInfo().then(response => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(204);
     });
   });
 
@@ -34,7 +34,7 @@ describe('Authorization', () => {
 
     return client.getAccountInfo().then(response => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(204);
     });
   });
 
@@ -48,7 +48,7 @@ describe('Authorization', () => {
 
     return client.getAccountInfo().then(response => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(204);
     });
   });
 });
@@ -66,13 +66,13 @@ describe('Methods', () => {
 
     return client.getAccountInfo().then(response => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(204);
     });
   });
 
   describe('getAccountInfo', () => {
     it('should return status 204', () => {
-      expect.assertions(2);
+      expect.assertions(4);
       return client.getAccountInfo().then(response => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(204);

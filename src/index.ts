@@ -1,12 +1,20 @@
 import fs from 'fs';
+import got from 'got';
 import Stream from 'stream';
-import request from 'request';
-import rp from 'request-promise-native';
+import { URLSearchParams } from 'url';
 
 type Protocol = 1 | 2 | 3;
 type ContainerType = 'public' | 'private';
 
-const baseUri = (key = 'api') => `https://${key}.selcdn.ru`;
+export interface FileObject {
+  bytes: number;
+  content_type: string;
+  hash: string;
+  last_modified: string;
+  name: string;
+}
+
+const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
   private readonly accountId: string;
@@ -44,25 +52,15 @@ export class SelectelStorageClient {
    * Account information
    */
   public getAccountInfo() {
-    return this.makeRequest({
-      uri: this.storageUrl,
-      method: 'GET',
-      resolveWithFullResponse: true,
-    }).catch(handleError);
+    return this.makeRequest(this.storageUrl, 'HEAD').catch(handleError);
   }
 
   /**
    * Summary storage information
-   *
+   * @todo: this one always returns forbidden. event when call from curl
    */
   public getInfo() {
-    const accountId =
-      this.userId.indexOf('_') !== -1 ? this.userId.split('_')[0] : this.userId;
-    return this.makeRequest({
-      uri: baseUri(accountId),
-      method: 'GET',
-      resolveWithFullResponse: true,
-    }).catch(handleError);
+    return this.makeRequest(baseUrl(this.accountId), 'HEAD').catch(handleError);
   }
 
   //
@@ -76,21 +74,27 @@ export class SelectelStorageClient {
    */
   public getContainers(returnJson = true) {
     if (returnJson) {
-      return this.makeRequest({
-        uri: baseUri(this.accountId),
-        method: 'GET',
-        qs: {
-          format: 'json',
+      const query = new URLSearchParams([['format', 'json']]);
+      return this.makeRequest(baseUrl(this.accountId), 'GET', {
+        query,
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
         },
+        // json: true,
       }).catch(handleError);
     }
 
-    return this.makeRequest({
-      method: 'GET',
-      resolveWithFullResponse: true,
-    }).catch(handleError);
+    return this.makeRequest(this.storageUrl).catch(handleError);
   }
 
+  /**
+   *
+   * @param {string} params.container - new container name
+   * @param {ContainerType} [params.type] - container type
+   * @param {string} [params.metadata] - additional meta data
+   * @returns {Promise<any>}
+   */
   public createContainer(params: {
     container: string;
     type?: ContainerType;
@@ -98,25 +102,25 @@ export class SelectelStorageClient {
   }) {
     validateParams(params);
 
-    return this.makeRequest({
-      uri: `${this.storageUrl}/${params.container}`,
-      method: 'PUT',
+    return this.makeRequest(`${this.storageUrl}/${params.container}`, 'PUT', {
       headers: {
         'X-Container-Meta-Type': params.type || 'public',
         'X-Container-Meta-Some': params.metadata || '',
       },
-      resolveWithFullResponse: true,
     }).catch(handleError);
   }
 
+  /**
+   * Receive container information
+   * @param {string} params.container - Container name
+   * @returns {Promise<any>}
+   */
   public getContainerInfo(params: { container: string }) {
     validateParams(params);
 
-    return this.makeRequest({
-      uri: `${this.storageUrl}/${params.container}`,
-      method: 'GET',
-      resolveWithFullResponse: true,
-    }).catch(handleError);
+    return this.makeRequest(`${this.storageUrl}/${params.container}`).catch(
+      handleError,
+    );
   }
 
   public getFiles(params: {
@@ -128,39 +132,31 @@ export class SelectelStorageClient {
     format?: 'json' | 'xml';
   }) {
     validateParams(params);
-    const qs = {} as {
-      limit?: number;
-      marker?: string;
-      prefix?: string;
-      delimiter?: string;
-      format?: 'json' | 'xml';
-    };
+
+    const query = new URLSearchParams();
 
     if (typeof params.format === 'string') {
-      qs.format = params.format;
+      query.append('format', params.format);
     }
 
     if (typeof params.limit === 'number') {
-      qs.limit = params.limit;
+      query.append('limit', params.limit.toString());
     }
 
     if (typeof params.marker === 'string') {
-      qs.marker = params.marker;
+      query.append('marker', params.marker);
     }
 
     if (typeof params.prefix === 'string') {
-      qs.prefix = params.prefix;
+      query.append('prefix', params.prefix);
     }
 
     if (typeof params.delimiter === 'string') {
-      qs.delimiter = params.delimiter;
+      query.append('delimiter', params.delimiter);
     }
 
-    return this.makeRequest({
-      uri: `${this.storageUrl}/${params.container}`,
-      method: 'GET',
-      qs,
-      resolveWithFullResponse: true,
+    return this.makeRequest(`${this.storageUrl}/${params.container}`, 'GET', {
+      query,
     })
       .then(response => {
         const files = parseFiles(response.body, params.format);
@@ -217,24 +213,28 @@ export class SelectelStorageClient {
       )
       .then(stream => {
         return this.makeRequest(
+          `${this.storageUrl}/${params.container}/${params.fileName}`,
+          'PUT',
           {
-            uri: `${this.storageUrl}/${params.container}/${params.fileName}`,
-            method: 'PUT',
             headers: {
               'X-Delete-At': params.deleteAt,
               'X-Delete-After': params.lifetime,
               Etag: params.etag,
               'X-Object-Meta': params.metadata,
             },
-            resolveWithFullResponse: true,
+            stream: true,
           },
-          true,
           stream,
         );
       })
       .catch(handleError);
   }
 
+  /**
+   * @param {string} params.container - Container name where you want to delete files
+   * @param {{string[]}} params.files - file names
+   * @returns {Promise<any>}
+   */
   public deleteFiles(params: { container: string; files: string[] }) {
     validateParams(params);
     if (!Array.isArray(params.files) || !params.files.length) {
@@ -243,58 +243,77 @@ export class SelectelStorageClient {
 
     const fullPaths = params.files.map(file => `${params.container}/${file}`);
     const body = fullPaths.join('\n');
+    const query = new URLSearchParams([['bulk-delete', 'true']]);
 
-    return this.makeRequest({
-      uri: this.storageUrl,
-      method: 'POST',
+    return this.makeRequest(this.storageUrl, 'POST', {
       headers: {
         'Content-Type': 'text/plain',
       },
-      qs: {
-        'bulk-delete': true,
-      },
       body,
-      resolveWithFullResponse: true,
+      query,
     });
   }
 
-  private authorize() {
-    return rp({
-      uri: `${baseUri()}${this.getAuthorizationPath()}`,
-      ...this.getAuthorizationParams(),
-    })
+  /**
+   * Authorize
+   * @returns {Promise<{ expire: string, token: string } | void>} When you want
+   * to extend class this could be helpful to memorize token. I.e. to redis
+   */
+  protected authorize(): Promise<{
+    expire: string | number;
+    token: string;
+  } | void> {
+    const client = got.extend({
+      baseUrl: baseUrl(),
+    });
+
+    return this.getAuthorizationParams(client)
       .then(response => {
         if (response) {
           switch (this.proto) {
-            case 1:
-              this.expireAuthToken =
+            case 1: {
+              const expire =
                 parseInt(response.headers['x-expire-auth-token'], 10) * 1000 +
                 Date.now();
+              this.expireAuthToken = expire;
               this.token = response.headers['x-auth-token'];
-              break;
+
+              return {
+                expire,
+                token: response.headers['x-auth-token'],
+              };
+            }
             case 2: {
-              const parsedResponse = JSON.parse(response);
-              this.expireAuthToken = new Date(
-                parsedResponse.access.token.expires,
+              const expire = new Date(
+                response.body.access.token.expires,
               ).getTime();
-              this.token = parsedResponse.access.token.id;
-              break;
+              this.expireAuthToken = expire;
+              this.token = response.body.access.token.id;
+
+              return {
+                expire,
+                token: response.body.access.token.id,
+              };
             }
             case 3:
             default: {
-              const parsedBody = JSON.parse(response.body);
-              this.expireAuthToken = new Date(
-                parsedBody.token.expires_at,
-              ).getTime();
+              const expire = new Date(response.body.token.expires_at).getTime();
+              this.expireAuthToken = expire;
               this.token = response.headers['x-subject-token'];
+
+              return {
+                expire,
+                token: response.headers['x-subject-token'],
+              };
             }
           }
         }
+        return {};
       })
       .catch(handleError);
   }
 
-  private getAuthorizationPath() {
+  private getAuthorizationPath(): string {
     switch (this.proto) {
       case 1:
         return '/auth/v1.0';
@@ -306,40 +325,38 @@ export class SelectelStorageClient {
     }
   }
 
-  private getAuthorizationParams() {
+  private getAuthorizationParams(client) {
+    const url = this.getAuthorizationPath();
     switch (this.proto) {
       case 1:
-        return {
-          method: 'GET',
+        return client.get(url, {
           headers: {
             'X-Auth-User': this.userId,
             'X-Auth-Key': this.password,
           },
-          resolveWithFullResponse: true,
-        };
+        });
       case 2:
-        return {
-          method: 'POST',
+        return client.post(url, {
           headers: {
             'Content-type': 'application/json',
           },
-          body: JSON.stringify({
+          body: {
             auth: {
               passwordCredentials: {
                 username: this.userId,
                 password: this.password,
               },
             },
-          }),
-        };
+          },
+          json: true,
+        });
       case 3:
       default:
-        return {
-          method: 'POST',
+        return client.post(url, {
           headers: {
             'Content-type': 'application/json',
           },
-          body: JSON.stringify({
+          body: {
             auth: {
               identity: {
                 methods: ['password'],
@@ -351,13 +368,16 @@ export class SelectelStorageClient {
                 },
               },
             },
-          }),
-          resolveWithFullResponse: true,
-        };
+          },
+          json: true,
+        });
     }
   }
 
-  private makeRequest(params, isStream = false, stream?: Stream): Promise<any> {
+  private makeRequest(url, method?, params?, stream?: Stream): Promise<any> {
+    const requestMethod = method || 'GET';
+    const gotOptions = (params || {}) as got.GotOptions<null>;
+
     return Promise.resolve()
       .then(() => {
         if (this.expireAuthToken && this.expireAuthToken <= Date.now()) {
@@ -369,20 +389,32 @@ export class SelectelStorageClient {
         return;
       })
       .then(() => {
-        const { uri, ...rest } = params;
         const options = {
-          ...rest,
-          uri: typeof uri === 'string' ? uri : this.storageUrl,
+          ...gotOptions,
           headers: {
-            ...params.headers,
+            ...gotOptions.headers,
             'X-Auth-Token': this.token,
           },
         };
+        const instance = got.extend({
+          ...gotOptions,
+          headers: {
+            ...gotOptions.headers,
+            'X-Auth-Token': this.token,
+          },
+        });
+        const client = selectMethod(instance, requestMethod);
 
-        if (isStream) {
-          return stream.pipe(request(options));
+        if (stream) {
+          return new Promise((resolve, reject) => {
+            stream
+              .pipe(client(url, options))
+              // TODO: we could implement 'uploadProgress' too?
+              .on('response', response => resolve(response))
+              .on('error', error => reject(error));
+          });
         }
-        return rp(options);
+        return client(url, options);
       });
   }
 }
@@ -401,15 +433,29 @@ function validateParams(params) {
   }
 }
 
-function parseFiles(body, format) {
+function parseFiles(body, format): string[] | FileObject[] {
   switch (format) {
     case 'json':
-      return JSON.parse(body);
+      return JSON.parse(body) as FileObject[];
     case 'xml':
       // I don't think we need to support xml
       throw new Error('Oops, xml is not currently supported');
     default:
       // remove last \n and split
       return body.trim().split('\n');
+  }
+}
+
+function selectMethod(instance, method) {
+  switch (method) {
+    case 'HEAD':
+      return instance.head;
+    case 'POST':
+      return instance.post;
+    case 'PUT':
+      return instance.put;
+    case 'GET':
+    default:
+      return instance.get;
   }
 }
