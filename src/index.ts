@@ -231,7 +231,10 @@ export class SelectelStorageClient {
   }
 
   /**
-   * @param {string} params.container - Container name where you want to delete files
+   * This method are allowed only for root users. Additional users even with
+   * write permissions should user `deleteFile` method
+   * @param {string} params.container - Container name where you want to delete
+   * files
    * @param {{string[]}} params.files - file names
    * @returns {Promise<any>}
    */
@@ -252,6 +255,21 @@ export class SelectelStorageClient {
       body,
       query,
     });
+  }
+
+  /**
+   * @param {string} params.container
+   * @param {string} params.file
+   * @returns {Promise<any>} statusCode "204" on success
+   */
+  public deleteFile(params: { container: string; file: string }) {
+    validateParams(params);
+    if (typeof params.file !== 'string') {
+      throw new Error('File missed');
+    }
+
+    const url = `${this.storageUrl}/${params.container}/${params.file}`;
+    return this.makeRequest(url, 'DELETE');
   }
 
   /**
@@ -454,6 +472,8 @@ function selectMethod(instance, method) {
       return instance.post;
     case 'PUT':
       return instance.put;
+    case 'DELETE':
+      return instance.delete;
     case 'GET':
     default:
       return instance.get;

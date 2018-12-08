@@ -332,12 +332,36 @@ describe('Methods', () => {
       expect.assertions(2);
       return client
         .deleteFiles({
-          container,
+          container: 'logos',
           files: ['image-1.png', 'image-2.png', 'image-3.png'],
         })
         .then(response => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(200);
+        });
+    });
+  });
+
+  describe('deleteFile', () => {
+    beforeAll(() => {
+      // use some of yours existed containers
+      return client.uploadFile({
+        container: 'logos',
+        file: path.resolve(__dirname, 'image.png'),
+        fileName: `image.png`,
+      });
+    });
+
+    it('should delete file', () => {
+      expect.assertions(2);
+      return client
+        .deleteFile({
+          container: 'logos',
+          file: 'image.png',
+        })
+        .then(response => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(204);
         });
     });
   });
