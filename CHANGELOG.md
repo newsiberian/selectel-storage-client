@@ -1,5 +1,10 @@
 # Change Log
 
+# [0.3.4] - 2019-01-17
+
+- `uploadFile`: `fileName` now optional
+
+
 # [0.3.3] - 2019-01-17
 
 - `uploadFile`: added possibility to send archives, which could be automatically extracted

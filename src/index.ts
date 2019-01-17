@@ -178,13 +178,16 @@ export class SelectelStorageClient {
   /**
    * Upload single file to Selectel storage
    * @param {object} params
+   * @param {string} [params.fileName] in case when archive are passed, filename
+   * can be omitted. In that case all archived files will be extracted within
+   * container root, or it could be used as a folder name
    * @param {Buffer | string} params.file - file's buffer or local path
    * @returns {Promise<void>}
    */
   public uploadFile(params: {
     container: string;
     file: Buffer | Stream | string;
-    fileName: string;
+    fileName?: string;
     deleteAt?: number;
     lifetime?: number;
     etag?: string;
@@ -223,7 +226,9 @@ export class SelectelStorageClient {
             : {};
 
         return this.makeRequest(
-          `${this.storageUrl}/${params.container}/${params.fileName}`,
+          `${this.storageUrl}/${params.container}${
+            typeof params.fileName ? `/${params.fileName}` : ''
+          }`,
           'PUT',
           {
             headers: {

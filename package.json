@@ -1,6 +1,6 @@
 {
   "name": "selectel-storage-client",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Node.js client for Selectel Storage",
   "main": "./dist/bundle.js",
   "scripts": {
