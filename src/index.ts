@@ -189,6 +189,7 @@ export class SelectelStorageClient {
     lifetime?: number;
     etag?: string;
     metadata?: string;
+    archive?: 'tar' | 'tar.gz' | 'gzip';
   }) {
     validateParams(params);
 
@@ -212,6 +213,15 @@ export class SelectelStorageClient {
         },
       )
       .then(stream => {
+        const query =
+          typeof params.archive !== 'undefined'
+            ? {
+                query: new URLSearchParams([
+                  ['extract-archive', params.archive],
+                ]),
+              }
+            : {};
+
         return this.makeRequest(
           `${this.storageUrl}/${params.container}/${params.fileName}`,
           'PUT',
@@ -222,6 +232,7 @@ export class SelectelStorageClient {
               Etag: params.etag,
               'X-Object-Meta': params.metadata,
             },
+            ...query,
             stream: true,
           },
           stream,
@@ -414,13 +425,7 @@ export class SelectelStorageClient {
             'X-Auth-Token': this.token,
           },
         };
-        const instance = got.extend({
-          ...gotOptions,
-          headers: {
-            ...gotOptions.headers,
-            'X-Auth-Token': this.token,
-          },
-        });
+        const instance = got.extend(options);
         const client = selectMethod(instance, requestMethod);
 
         if (stream) {
