@@ -14,6 +14,17 @@ export interface FileObject {
   name: string;
 }
 
+interface JSONFile {
+  bytes: number;
+  content_type: string;
+  hash: string;
+  last_modified: string;
+  /**
+   * file name with route
+   */
+  name: string;
+}
+
 const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
@@ -130,7 +141,13 @@ export class SelectelStorageClient {
     prefix?: string;
     delimiter?: string;
     format?: 'json' | 'xml';
-  }) {
+  }): Promise<{
+    // TODO: add xml file interface when xml will be supported
+    files: string[] | JSONFile[];
+    filesAmount: number;
+    containerSize: number;
+    containerType: string;
+  } | void> {
     validateParams(params);
 
     const query = new URLSearchParams();
