@@ -3,8 +3,8 @@ import got from 'got';
 import Stream from 'stream';
 import { URLSearchParams } from 'url';
 
-type Protocol = 1 | 2 | 3;
-type ContainerType = 'public' | 'private';
+export type Protocol = 1 | 2 | 3;
+export type ContainerType = 'public' | 'private' | 'gallery';
 
 export interface FileObject {
   bytes: number;
@@ -14,7 +14,7 @@ export interface FileObject {
   name: string;
 }
 
-interface JSONFile {
+export interface JSONFile {
   bytes: number;
   content_type: string;
   hash: string;
@@ -141,40 +141,41 @@ export class SelectelStorageClient {
     prefix?: string;
     delimiter?: string;
     format?: 'json' | 'xml';
-  }): Promise<{
-    // TODO: add xml file interface when xml will be supported
-    files: string[] | JSONFile[];
-    filesAmount: number;
-    containerSize: number;
-    containerType: string;
-  } | void> {
-    validateParams(params);
+  }) {
+    return Promise.resolve()
+      .then(() => {
+        validateParams(params);
 
-    const query = new URLSearchParams();
+        const query = new URLSearchParams();
 
-    if (typeof params.format === 'string') {
-      query.append('format', params.format);
-    }
+        if (typeof params.format === 'string') {
+          query.append('format', params.format);
+        }
 
-    if (typeof params.limit === 'number') {
-      query.append('limit', params.limit.toString());
-    }
+        if (typeof params.limit === 'number') {
+          query.append('limit', params.limit.toString());
+        }
 
-    if (typeof params.marker === 'string') {
-      query.append('marker', params.marker);
-    }
+        if (typeof params.marker === 'string') {
+          query.append('marker', params.marker);
+        }
 
-    if (typeof params.prefix === 'string') {
-      query.append('prefix', params.prefix);
-    }
+        if (typeof params.prefix === 'string') {
+          query.append('prefix', params.prefix);
+        }
 
-    if (typeof params.delimiter === 'string') {
-      query.append('delimiter', params.delimiter);
-    }
+        if (typeof params.delimiter === 'string') {
+          query.append('delimiter', params.delimiter);
+        }
 
-    return this.makeRequest(`${this.storageUrl}/${params.container}`, 'GET', {
-      query,
-    })
+        return this.makeRequest(
+          `${this.storageUrl}/${params.container}`,
+          'GET',
+          {
+            query,
+          },
+        );
+      })
       .then(response => {
         const files = parseFiles(response.body, params.format);
 
@@ -183,9 +184,14 @@ export class SelectelStorageClient {
           filesAmount: +response.headers['x-container-object-count'],
           containerSize: +response.headers['x-container-bytes-used'],
           containerType: response.headers['x-container-meta-type'],
+        } as {
+          // TODO: add xml file interface when xml will be supported
+          files: string[] | JSONFile[];
+          filesAmount: number;
+          containerSize: number;
+          containerType: ContainerType;
         };
-      })
-      .catch(handleError);
+      });
   }
 
   //
