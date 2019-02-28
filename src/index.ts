@@ -14,17 +14,6 @@ export interface FileObject {
   name: string;
 }
 
-export interface JSONFile {
-  bytes: number;
-  content_type: string;
-  hash: string;
-  last_modified: string;
-  /**
-   * file name with route
-   */
-  name: string;
-}
-
 const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
@@ -186,7 +175,7 @@ export class SelectelStorageClient {
           containerType: response.headers['x-container-meta-type'],
         } as {
           // TODO: add xml file interface when xml will be supported
-          files: string[] | JSONFile[];
+          files: string[] | FileObject[];
           filesAmount: number;
           containerSize: number;
           containerType: ContainerType;
@@ -217,11 +206,11 @@ export class SelectelStorageClient {
     metadata?: string;
     archive?: 'tar' | 'tar.gz' | 'gzip';
   }) {
-    validateParams(params);
-
     return Promise.resolve()
       .then(
         (): Stream | Promise<Stream> => {
+          validateParams(params);
+
           if (typeof params.file === 'string') {
             // return readFile(params.file);
             return fs.createReadStream(params.file);
@@ -265,8 +254,7 @@ export class SelectelStorageClient {
           },
           stream,
         );
-      })
-      .catch(handleError);
+      });
   }
 
   /**

@@ -1,5 +1,11 @@
 # Change Log
 
+# [0.4.0] - 2019-02-26
+
+- removed rollup since lib consist of one file
+- methods code are wrapped in Promises to be capable to catch all exceptions on the runner side
+- removed catch handlers
+
 # [0.3.4] - 2019-01-17
 
 - `uploadFile`: `fileName` now optional
