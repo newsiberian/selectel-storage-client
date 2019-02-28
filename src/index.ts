@@ -17,8 +17,12 @@ export interface FileObject {
 const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
+  /**
+   * userId is a public since it is required from outside when we want to cache
+   * token and we have several selectel users in our app
+   */
+  public readonly userId: string;
   private readonly accountId: string;
-  private readonly userId: string;
   private readonly password: string;
   private readonly proto: Protocol;
   private readonly storageUrl: string;
@@ -301,7 +305,7 @@ export class SelectelStorageClient {
 
   /**
    * Authorize
-   * @returns {Promise<{ expire: string, token: string } | void>} When you want
+   * @returns {Promise<{ expire: string, token: string }>} When you want
    * to extend class this could be helpful to memorize token. I.e. to redis
    */
   protected authorize(): Promise<{
