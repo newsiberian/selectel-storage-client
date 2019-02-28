@@ -305,57 +305,55 @@ export class SelectelStorageClient {
    * to extend class this could be helpful to memorize token. I.e. to redis
    */
   protected authorize(): Promise<{
-    expire: string | number;
-    token: string;
-  } | void> {
+    expire?: string | number;
+    token?: string;
+  }> {
     const client = got.extend({
       baseUrl: baseUrl(),
     });
 
-    return this.getAuthorizationParams(client)
-      .then(response => {
-        if (response) {
-          switch (this.proto) {
-            case 1: {
-              const expire =
-                parseInt(response.headers['x-expire-auth-token'], 10) * 1000 +
-                Date.now();
-              this.expireAuthToken = expire;
-              this.token = response.headers['x-auth-token'];
+    return this.getAuthorizationParams(client).then(response => {
+      if (response) {
+        switch (this.proto) {
+          case 1: {
+            const expire =
+              parseInt(response.headers['x-expire-auth-token'], 10) * 1000 +
+              Date.now();
+            this.expireAuthToken = expire;
+            this.token = response.headers['x-auth-token'];
 
-              return {
-                expire,
-                token: response.headers['x-auth-token'],
-              };
-            }
-            case 2: {
-              const expire = new Date(
-                response.body.access.token.expires,
-              ).getTime();
-              this.expireAuthToken = expire;
-              this.token = response.body.access.token.id;
+            return {
+              expire,
+              token: response.headers['x-auth-token'],
+            };
+          }
+          case 2: {
+            const expire = new Date(
+              response.body.access.token.expires,
+            ).getTime();
+            this.expireAuthToken = expire;
+            this.token = response.body.access.token.id;
 
-              return {
-                expire,
-                token: response.body.access.token.id,
-              };
-            }
-            case 3:
-            default: {
-              const expire = new Date(response.body.token.expires_at).getTime();
-              this.expireAuthToken = expire;
-              this.token = response.headers['x-subject-token'];
+            return {
+              expire,
+              token: response.body.access.token.id,
+            };
+          }
+          case 3:
+          default: {
+            const expire = new Date(response.body.token.expires_at).getTime();
+            this.expireAuthToken = expire;
+            this.token = response.headers['x-subject-token'];
 
-              return {
-                expire,
-                token: response.headers['x-subject-token'],
-              };
-            }
+            return {
+              expire,
+              token: response.headers['x-subject-token'],
+            };
           }
         }
-        return {};
-      })
-      .catch(handleError);
+      }
+      return {};
+    });
   }
 
   private getAuthorizationPath(): string {
