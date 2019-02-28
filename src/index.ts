@@ -14,6 +14,13 @@ export interface FileObject {
   name: string;
 }
 
+export interface Params {
+  userId: string;
+  password: string;
+  proto?: Protocol;
+  token?: string;
+}
+
 const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
@@ -29,19 +36,20 @@ export class SelectelStorageClient {
   /**
    * Authorization token
    */
-  private token: string;
-  private expireAuthToken: number;
+  private token?: string;
+  private expireAuthToken?: number;
 
   private static extractAccountId(userId: string): string {
     return userId.indexOf('_') !== -1 ? userId.split('_')[0] : userId;
   }
 
-  constructor(params: { userId: string; password: string; proto?: Protocol }) {
+  constructor(params: Params) {
     this.userId = params.userId;
     this.password = params.password;
     this.proto = params.proto || 3;
     this.accountId = SelectelStorageClient.extractAccountId(this.userId);
     this.storageUrl = `https://api.selcdn.ru/v1/SEL_${this.accountId}`;
+    this.token = params.token || null;
 
     if (!this.userId) {
       throw new Error('User is required');

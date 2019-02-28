@@ -2,7 +2,8 @@
 
 # [0.5.0] - 2019-02-28
 
-- `userId` now public, since we need it sometimes from outside, i.e. when we want to cache token  
+- `userId` now public, since we need it sometimes from outside, i.e. when we want to cache token
+- `token` now acceptable as class parameter
 
 # [0.4.0] - 2019-02-26
 
