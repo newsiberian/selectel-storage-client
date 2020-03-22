@@ -1,5 +1,9 @@
 # Change Log
 
+# [0.6.0] - 2020-03-22
+
+- migrated to `got@^10.6.0`
+
 # [0.5.0] - 2019-02-28
 
 - `userId` now public, since we need it sometimes from outside, i.e. when we want to cache token

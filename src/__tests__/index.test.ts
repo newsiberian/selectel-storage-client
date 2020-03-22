@@ -18,10 +18,15 @@ describe('Authorization', () => {
       proto: 1,
     });
 
-    return client.getAccountInfo().then(response => {
-      expect(response).toBeDefined();
-      expect(response.statusCode).toBe(204);
-    });
+    return client
+      .getAccountInfo()
+      .then((response) => {
+        expect(response).toBeDefined();
+        expect(response.statusCode).toBe(204);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
   });
 
   it('should receive token via protocol v2.0 authorization', () => {
@@ -32,7 +37,7 @@ describe('Authorization', () => {
       proto: 2,
     });
 
-    return client.getAccountInfo().then(response => {
+    return client.getAccountInfo().then((response) => {
       expect(response).toBeDefined();
       expect(response.statusCode).toBe(204);
     });
@@ -46,7 +51,7 @@ describe('Authorization', () => {
       proto: 3,
     });
 
-    return client.getAccountInfo().then(response => {
+    return client.getAccountInfo().then((response) => {
       expect(response).toBeDefined();
       expect(response.statusCode).toBe(204);
     });
@@ -64,7 +69,7 @@ describe('Methods', () => {
       proto: 3,
     });
 
-    return client.getAccountInfo().then(response => {
+    return client.getAccountInfo().then((response) => {
       expect(response).toBeDefined();
       expect(response.statusCode).toBe(204);
     });
@@ -73,7 +78,7 @@ describe('Methods', () => {
   describe('getAccountInfo', () => {
     it('should return status 204', () => {
       expect.assertions(4);
-      return client.getAccountInfo().then(response => {
+      return client.getAccountInfo().then((response) => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(204);
       });
@@ -83,7 +88,7 @@ describe('Methods', () => {
   describe('getInfo', () => {
     it('should return status 204', () => {
       expect.assertions(2);
-      return client.getInfo().then(response => {
+      return client.getInfo().then((response) => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(204);
       });
@@ -93,7 +98,7 @@ describe('Methods', () => {
   describe('getContainers', () => {
     it('should return string body', () => {
       expect.assertions(3);
-      return client.getContainers(false).then(response => {
+      return client.getContainers(false).then((response) => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(200);
         expect(response.body).toEqual(expect.any(String));
@@ -102,7 +107,7 @@ describe('Methods', () => {
 
     it('should return json body', () => {
       expect.assertions(3);
-      return client.getContainers().then(response => {
+      return client.getContainers().then((response) => {
         expect(response).toBeDefined();
         expect(response.statusCode).toBe(200);
         expect(response.body).toEqual(expect.any(String));
@@ -117,7 +122,7 @@ describe('Methods', () => {
         .createContainer({
           container: faker.name.firstName(),
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
         });
@@ -130,7 +135,7 @@ describe('Methods', () => {
           container: faker.name.firstName(),
           type: 'private',
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
         });
@@ -163,7 +168,7 @@ describe('Methods', () => {
         .createContainer({
           container,
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
 
@@ -171,7 +176,7 @@ describe('Methods', () => {
             container,
           });
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(204);
         });
@@ -199,7 +204,7 @@ describe('Methods', () => {
         })
         .then(() => {
           return Promise.all(
-            [1, 2, 3].map(i =>
+            [1, 2, 3].map((i) =>
               client.uploadFile({
                 container,
                 file: path.resolve(__dirname, 'image.png'),
@@ -212,14 +217,14 @@ describe('Methods', () => {
 
     it('should receive files from container', () => {
       expect.assertions(1);
-      return client.getFiles({ container }).then(result => {
+      return client.getFiles({ container }).then((result) => {
         expect(result.files).toHaveLength(3);
       });
     });
 
     it('should receive files in json', () => {
       expect.assertions(1);
-      return client.getFiles({ container, format: 'json' }).then(result => {
+      return client.getFiles({ container, format: 'json' }).then((result) => {
         expect(result.files).toHaveLength(3);
       });
     });
@@ -228,7 +233,7 @@ describe('Methods', () => {
       expect.assertions(2);
       return client
         .getFiles({ container, marker: 'image-1.png' })
-        .then(result => {
+        .then((result) => {
           expect(result.files).toHaveLength(2);
           expect(result.files).toEqual(
             expect.arrayContaining(['image-2.png', 'image-3.png']),
@@ -238,7 +243,7 @@ describe('Methods', () => {
 
     it('should receive limited number of files', () => {
       expect.assertions(1);
-      return client.getFiles({ container, limit: 1 }).then(result => {
+      return client.getFiles({ container, limit: 1 }).then((result) => {
         expect(result.files).toHaveLength(1);
       });
     });
@@ -264,7 +269,7 @@ describe('Methods', () => {
           file: path.resolve(__dirname, 'image.png'),
           fileName: 'image.png',
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
         });
@@ -281,7 +286,7 @@ describe('Methods', () => {
           file: buffer,
           fileName: 'image.png',
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
         });
@@ -298,7 +303,7 @@ describe('Methods', () => {
           file: stream,
           fileName: 'image.png',
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(201);
         });
@@ -317,7 +322,7 @@ describe('Methods', () => {
         })
         .then(() => {
           return Promise.all(
-            [1, 2, 3].map(i =>
+            [1, 2, 3].map((i) =>
               client.uploadFile({
                 container,
                 file: path.resolve(__dirname, 'image.png'),
@@ -335,7 +340,7 @@ describe('Methods', () => {
           container: 'logos',
           files: ['image-1.png', 'image-2.png', 'image-3.png'],
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(200);
         });
@@ -359,7 +364,7 @@ describe('Methods', () => {
           container: 'logos',
           file: 'image.png',
         })
-        .then(response => {
+        .then((response) => {
           expect(response).toBeDefined();
           expect(response.statusCode).toBe(204);
         });

@@ -21,7 +21,7 @@ export interface Params {
   token?: string;
 }
 
-const baseUrl = (key = 'api') => `https://${key}.selcdn.ru`;
+const prefixUrl = (key = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
   /**
@@ -48,8 +48,8 @@ export class SelectelStorageClient {
     this.password = params.password;
     this.proto = params.proto || 3;
     this.accountId = SelectelStorageClient.extractAccountId(this.userId);
-    this.storageUrl = `https://api.selcdn.ru/v1/SEL_${this.accountId}`;
-    this.token = params.token || null;
+    this.storageUrl = `${prefixUrl()}/v1/SEL_${this.accountId}`;
+    this.token = params.token;
 
     if (!this.userId) {
       throw new Error('User is required');
@@ -72,7 +72,9 @@ export class SelectelStorageClient {
    * @todo: this one always returns forbidden. event when call from curl
    */
   public getInfo() {
-    return this.makeRequest(baseUrl(this.accountId), 'HEAD').catch(handleError);
+    return this.makeRequest(prefixUrl(this.accountId), 'HEAD').catch(
+      handleError,
+    );
   }
 
   //
@@ -86,14 +88,15 @@ export class SelectelStorageClient {
    */
   public getContainers(returnJson = true) {
     if (returnJson) {
-      const query = new URLSearchParams([['format', 'json']]);
-      return this.makeRequest(baseUrl(this.accountId), 'GET', {
-        query,
+      const searchParams = new URLSearchParams([['format', 'json']]);
+      return this.makeRequest(prefixUrl(this.accountId), 'GET', {
+        searchParams,
         headers: {
           accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        // json: true,
+        responseType: returnJson ? 'json' : 'text',
+        resolveBodyOnly: returnJson,
       }).catch(handleError);
     }
 
@@ -147,37 +150,37 @@ export class SelectelStorageClient {
       .then(() => {
         validateParams(params);
 
-        const query = new URLSearchParams();
+        const searchParams = new URLSearchParams();
 
         if (typeof params.format === 'string') {
-          query.append('format', params.format);
+          searchParams.append('format', params.format);
         }
 
         if (typeof params.limit === 'number') {
-          query.append('limit', params.limit.toString());
+          searchParams.append('limit', params.limit.toString());
         }
 
         if (typeof params.marker === 'string') {
-          query.append('marker', params.marker);
+          searchParams.append('marker', params.marker);
         }
 
         if (typeof params.prefix === 'string') {
-          query.append('prefix', params.prefix);
+          searchParams.append('prefix', params.prefix);
         }
 
         if (typeof params.delimiter === 'string') {
-          query.append('delimiter', params.delimiter);
+          searchParams.append('delimiter', params.delimiter);
         }
 
         return this.makeRequest(
           `${this.storageUrl}/${params.container}`,
           'GET',
           {
-            query,
+            searchParams,
           },
         );
       })
-      .then(response => {
+      .then((response) => {
         const files = parseFiles(response.body, params.format);
 
         return {
@@ -219,31 +222,29 @@ export class SelectelStorageClient {
     archive?: 'tar' | 'tar.gz' | 'gzip';
   }) {
     return Promise.resolve()
-      .then(
-        (): Stream | Promise<Stream> => {
-          validateParams(params);
+      .then((): Stream | Promise<Stream> => {
+        validateParams(params);
 
-          if (typeof params.file === 'string') {
-            // return readFile(params.file);
-            return fs.createReadStream(params.file);
-          } else if (params.file instanceof Stream) {
-            return params.file;
-          } else if (params.file instanceof Buffer) {
-            // @thanks to https://stackoverflow.com/a/44091532/7252759
-            const readable = new Stream.Readable();
-            // _read is required but you can noop it
-            readable._read = () => null;
-            readable.push(params.file);
-            readable.push(null);
-            return readable;
-          }
-        },
-      )
-      .then(stream => {
-        const query =
+        if (typeof params.file === 'string') {
+          // return readFile(params.file);
+          return fs.createReadStream(params.file);
+        } else if (params.file instanceof Stream) {
+          return params.file;
+        } else if (params.file instanceof Buffer) {
+          // @thanks to https://stackoverflow.com/a/44091532/7252759
+          const readable = new Stream.Readable();
+          // _read is required but you can noop it
+          readable._read = () => null;
+          readable.push(params.file);
+          readable.push(null);
+          return readable;
+        }
+      })
+      .then((stream) => {
+        const searchParams =
           typeof params.archive !== 'undefined'
             ? {
-                query: new URLSearchParams([
+                searchParams: new URLSearchParams([
                   ['extract-archive', params.archive],
                 ]),
               }
@@ -261,8 +262,8 @@ export class SelectelStorageClient {
               Etag: params.etag,
               'X-Object-Meta': params.metadata,
             },
-            ...query,
-            stream: true,
+            ...searchParams,
+            isStream: true,
           },
           stream,
         );
@@ -283,16 +284,16 @@ export class SelectelStorageClient {
       throw new Error('Files missed');
     }
 
-    const fullPaths = params.files.map(file => `${params.container}/${file}`);
+    const fullPaths = params.files.map((file) => `${params.container}/${file}`);
     const body = fullPaths.join('\n');
-    const query = new URLSearchParams([['bulk-delete', 'true']]);
+    const searchParams = new URLSearchParams([['bulk-delete', 'true']]);
 
     return this.makeRequest(this.storageUrl, 'POST', {
       headers: {
         'Content-Type': 'text/plain',
       },
       body,
-      query,
+      searchParams,
     });
   }
 
@@ -320,19 +321,16 @@ export class SelectelStorageClient {
     expire?: string | number;
     token?: string;
   }> {
-    const client = got.extend({
-      baseUrl: baseUrl(),
-    });
-
-    return this.getAuthorizationParams(client).then(response => {
+    return this.getAuthorizationParams().then(async (response) => {
       if (response) {
         switch (this.proto) {
           case 1: {
             const expire =
-              parseInt(response.headers['x-expire-auth-token'], 10) * 1000 +
+              parseInt(response.headers['x-expire-auth-token'] as string, 10) *
+                1000 +
               Date.now();
             this.expireAuthToken = expire;
-            this.token = response.headers['x-auth-token'];
+            this.token = response.headers['x-auth-token'] as string;
 
             return {
               expire,
@@ -340,26 +338,24 @@ export class SelectelStorageClient {
             };
           }
           case 2: {
-            const expire = new Date(
-              response.body.access.token.expires,
-            ).getTime();
+            const expire = new Date(response.access.token.expires).getTime();
             this.expireAuthToken = expire;
-            this.token = response.body.access.token.id;
+            this.token = response.access.token.id;
 
             return {
               expire,
-              token: response.body.access.token.id,
+              token: response.access.token.id,
             };
           }
           case 3:
           default: {
-            const expire = new Date(response.body.token.expires_at).getTime();
+            const expire = new Date(response[1].token.expires_at).getTime();
             this.expireAuthToken = expire;
-            this.token = response.headers['x-subject-token'];
+            this.token = response[0].headers['x-subject-token'] as string;
 
             return {
               expire,
-              token: response.headers['x-subject-token'],
+              token: response[0].headers['x-subject-token'],
             };
           }
         }
@@ -371,31 +367,33 @@ export class SelectelStorageClient {
   private getAuthorizationPath(): string {
     switch (this.proto) {
       case 1:
-        return '/auth/v1.0';
+        return 'auth/v1.0';
       case 2:
-        return '/v2.0/tokens';
+        return 'v2.0/tokens';
       case 3:
       default:
-        return '/v3/auth/tokens';
+        return 'v3/auth/tokens';
     }
   }
 
-  private getAuthorizationParams(client) {
+  private getAuthorizationParams(): Promise<any> {
     const url = this.getAuthorizationPath();
     switch (this.proto) {
       case 1:
-        return client.get(url, {
+        return got.get(url, {
+          prefixUrl: prefixUrl(),
           headers: {
             'X-Auth-User': this.userId,
             'X-Auth-Key': this.password,
           },
         });
       case 2:
-        return client.post(url, {
+        return got.post(url, {
+          prefixUrl: prefixUrl(),
           headers: {
             'Content-type': 'application/json',
           },
-          body: {
+          json: {
             auth: {
               passwordCredentials: {
                 username: this.userId,
@@ -403,15 +401,17 @@ export class SelectelStorageClient {
               },
             },
           },
-          json: true,
+          responseType: 'json',
+          resolveBodyOnly: true,
         });
       case 3:
-      default:
-        return client.post(url, {
+      default: {
+        const response = got.post(url, {
+          prefixUrl: prefixUrl(),
           headers: {
             'Content-type': 'application/json',
           },
-          body: {
+          json: {
             auth: {
               identity: {
                 methods: ['password'],
@@ -424,14 +424,17 @@ export class SelectelStorageClient {
               },
             },
           },
-          json: true,
+          responseType: 'json',
         });
+        // we need both: response and json-body
+        return Promise.all([response, response.json()]);
+      }
     }
   }
 
-  private makeRequest(url, method?, params?, stream?: Stream): Promise<any> {
+  private makeRequest(url, method?, params?, stream?: Stream) {
     const requestMethod = method || 'GET';
-    const gotOptions = (params || {}) as got.GotOptions<null>;
+    const gotOptions = params || {};
 
     return Promise.resolve()
       .then(() => {
@@ -459,8 +462,8 @@ export class SelectelStorageClient {
             stream
               .pipe(client(url, options))
               // TODO: we could implement 'uploadProgress' too?
-              .on('response', response => resolve(response))
-              .on('error', error => reject(error));
+              .on('response', (response) => resolve(response))
+              .on('error', (error) => reject(error));
           });
         }
         return client(url, options);
