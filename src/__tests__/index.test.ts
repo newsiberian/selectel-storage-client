@@ -106,11 +106,19 @@ describe('Methods', () => {
     });
 
     it('should return json body', () => {
-      expect.assertions(3);
+      expect.assertions(2);
       return client.getContainers().then((response) => {
         expect(response).toBeDefined();
-        expect(response.statusCode).toBe(200);
-        expect(response.body).toEqual(expect.any(String));
+        expect(response).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: expect.any(String),
+              count: expect.any(Number),
+              bytes: expect.any(Number),
+              type: expect.any(String),
+            }),
+          ]),
+        );
       });
     });
   });

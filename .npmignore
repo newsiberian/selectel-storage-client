@@ -1,6 +1,7 @@
 .idea/
 .gitignore
 .env
+.yarnrc
 covarage/
 node_modules/
 src/

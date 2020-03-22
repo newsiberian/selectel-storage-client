@@ -19,9 +19,10 @@ export interface Params {
   password: string;
   proto?: Protocol;
   token?: string;
+  numericDomain?: number;
 }
 
-const prefixUrl = (key = 'api') => `https://${key}.selcdn.ru`;
+const prefixUrl = (key: number | string = 'api') => `https://${key}.selcdn.ru`;
 
 export class SelectelStorageClient {
   /**
@@ -33,6 +34,7 @@ export class SelectelStorageClient {
   private readonly password: string;
   private readonly proto: Protocol;
   private readonly storageUrl: string;
+  private numericDomain?: number;
   /**
    * Authorization token
    */
@@ -49,6 +51,7 @@ export class SelectelStorageClient {
     this.proto = params.proto || 3;
     this.accountId = SelectelStorageClient.extractAccountId(this.userId);
     this.storageUrl = `${prefixUrl()}/v1/SEL_${this.accountId}`;
+    this.numericDomain = params.numericDomain;
     this.token = params.token;
 
     if (!this.userId) {
@@ -72,9 +75,11 @@ export class SelectelStorageClient {
    * @todo: this one always returns forbidden. event when call from curl
    */
   public getInfo() {
-    return this.makeRequest(prefixUrl(this.accountId), 'HEAD').catch(
-      handleError,
-    );
+    return this.getNumericDomain()
+      .then((numericDomain) =>
+        this.makeRequest(prefixUrl(numericDomain), 'HEAD'),
+      )
+      .catch(handleError);
   }
 
   //
@@ -89,15 +94,19 @@ export class SelectelStorageClient {
   public getContainers(returnJson = true) {
     if (returnJson) {
       const searchParams = new URLSearchParams([['format', 'json']]);
-      return this.makeRequest(prefixUrl(this.accountId), 'GET', {
-        searchParams,
-        headers: {
-          accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        responseType: returnJson ? 'json' : 'text',
-        resolveBodyOnly: returnJson,
-      }).catch(handleError);
+      return this.getNumericDomain()
+        .then((numericDomain) =>
+          this.makeRequest(prefixUrl(numericDomain), 'GET', {
+            searchParams,
+            headers: {
+              accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            responseType: 'json',
+            resolveBodyOnly: true,
+          }),
+        )
+        .catch(handleError);
     }
 
     return this.makeRequest(this.storageUrl).catch(handleError);
@@ -364,6 +373,16 @@ export class SelectelStorageClient {
     });
   }
 
+  protected loadNumericDomain(): Promise<any> {
+    return got.get({
+      prefixUrl: prefixUrl('auth'),
+      headers: {
+        'X-Auth-User': this.userId,
+        'X-Auth-Key': this.password,
+      },
+    });
+  }
+
   private getAuthorizationPath(): string {
     switch (this.proto) {
       case 1:
@@ -430,6 +449,29 @@ export class SelectelStorageClient {
         return Promise.all([response, response.json()]);
       }
     }
+  }
+
+  private getNumericDomain(): Promise<number> {
+    return new Promise((resolve) => {
+      if (typeof this.numericDomain === 'number') {
+        resolve(this.numericDomain);
+      }
+      return this.loadNumericDomain().then((response) => {
+        if (typeof response.headers['x-storage-url'] === 'string') {
+          const numericDomain = +response.headers['x-storage-url']
+            .split('//')[1]
+            .split('.')[0];
+          if (!isNaN(numericDomain)) {
+            this.numericDomain = numericDomain;
+            resolve(numericDomain);
+          } else {
+            throw new Error(
+              'Unable to extract numeric domain from Selectel response headers',
+            );
+          }
+        }
+      });
+    });
   }
 
   private makeRequest(url, method?, params?, stream?: Stream) {

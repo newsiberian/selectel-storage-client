@@ -1,5 +1,9 @@
 # Change Log
 
+# [0.6.1] - 2020-03-22
+
+- fixed bug w/ incorrect understanding of numeric domain usage in two requests;
+
 # [0.6.0] - 2020-03-22
 
 - migrated to `got@^10.6.0`
