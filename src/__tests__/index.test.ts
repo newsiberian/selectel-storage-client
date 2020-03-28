@@ -350,7 +350,7 @@ describe('Methods', () => {
         })
         .then((response) => {
           expect(response).toBeDefined();
-          expect(response.statusCode).toBe(200);
+          expect(response['Response Status']).toBe('200 OK');
         });
     });
   });

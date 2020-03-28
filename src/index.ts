@@ -303,6 +303,8 @@ export class SelectelStorageClient {
       },
       body,
       searchParams,
+      responseType: 'json',
+      resolveBodyOnly: true,
     });
   }
 
@@ -330,7 +332,7 @@ export class SelectelStorageClient {
     expire?: string | number;
     token?: string;
   }> {
-    return this.getAuthorizationParams().then(async (response) => {
+    return this.authorizationRequest().then(async (response) => {
       if (response) {
         switch (this.proto) {
           case 1: {
@@ -395,7 +397,7 @@ export class SelectelStorageClient {
     }
   }
 
-  private getAuthorizationParams(): Promise<any> {
+  private authorizationRequest(): Promise<any> {
     const url = this.getAuthorizationPath();
     switch (this.proto) {
       case 1:

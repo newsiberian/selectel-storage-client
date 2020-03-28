@@ -1,5 +1,9 @@
 # Change Log
 
+# [0.6.2] - 2020-03-28
+
+- `deleteFiles` now returns JSON body only
+
 # [0.6.1] - 2020-03-22
 
 - fixed bug w/ incorrect understanding of numeric domain usage in two requests;

@@ -1,6 +1,6 @@
 {
   "name": "selectel-storage-client",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Node.js client for Selectel Storage",
   "main": "./dist/index.js",
   "scripts": {
@@ -27,17 +27,17 @@
   },
   "homepage": "https://github.com/newsiberian/selectel-storage-client#readme",
   "dependencies": {
-    "got": "^10.6.0"
+    "got": "^10.7.0"
   },
   "devDependencies": {
     "@types/jest": "25.1.4",
-    "@types/node": "13.9.2",
+    "@types/node": "13.9.5",
     "dotenv": "8.2.0",
     "faker": "4.1.0",
     "husky": "4.2.3",
-    "jest": "25.1.0",
-    "lint-staged": "10.0.8",
-    "prettier": "2.0.1",
+    "jest": "25.2.3",
+    "lint-staged": "10.0.9",
+    "prettier": "2.0.2",
     "rimraf": "3.0.2",
     "ts-jest": "25.2.1",
     "ts-node": "8.8.1",
