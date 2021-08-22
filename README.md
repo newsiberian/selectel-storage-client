@@ -2,3 +2,5 @@
 Another client implementation for Selectel storage API.
 
 This one uses Got
+
+[Selectel Storage API](https://developers.selectel.ru/docs/cloud-services/cloud-storage/selectel_storage_api/)

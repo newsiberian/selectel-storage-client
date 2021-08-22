@@ -1,5 +1,10 @@
 # Change Log
 
+# [0.6.3] - 2021-08-22
+
+- bump `got` to 11 stable
+- improve typings
+
 # [0.6.2] - 2020-03-28
 
 - `deleteFiles` now returns JSON body only

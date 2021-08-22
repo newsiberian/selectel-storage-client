@@ -3,6 +3,7 @@ import faker from 'faker';
 import fs from 'fs';
 import path from 'path';
 import util from 'util';
+import type { Response } from 'got';
 
 import { SelectelStorageClient } from '../';
 
@@ -22,7 +23,7 @@ describe('Authorization', () => {
       .getAccountInfo()
       .then((response) => {
         expect(response).toBeDefined();
-        expect(response.statusCode).toBe(204);
+        expect((response as Response).statusCode).toBe(204);
       })
       .catch((err) => {
         console.error(err);
@@ -39,7 +40,7 @@ describe('Authorization', () => {
 
     return client.getAccountInfo().then((response) => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(204);
+      expect((response as Response).statusCode).toBe(204);
     });
   });
 
@@ -53,7 +54,7 @@ describe('Authorization', () => {
 
     return client.getAccountInfo().then((response) => {
       expect(response).toBeDefined();
-      expect(response.statusCode).toBe(204);
+      expect((response as Response).statusCode).toBe(204);
     });
   });
 });
