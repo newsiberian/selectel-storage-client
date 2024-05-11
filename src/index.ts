@@ -5,8 +5,9 @@ import type { Response } from 'got';
 import * as fs from 'fs';
 import * as strm from 'stream';
 
-export type Protocol = 1 | 2 | 3;
 export type ContainerType = 'public' | 'private' | 'gallery';
+type KnownPools = 'ru-1' | 'ru-2' | 'ru-3' | 'ru-7' | 'ru-8' | 'ru-9' | 'gis-1';
+type Pool = KnownPools | Omit<KnownPools, string>;
 
 export interface FileObject {
   bytes: number;
@@ -20,12 +21,19 @@ interface RequiredParams {
   container: string;
 }
 
-export interface Params {
-  userId: string;
+export interface Options {
+  accountId: string;
+  username: string;
   password: string;
-  proto?: Protocol;
   token?: string;
-  numericDomain?: number;
+  projectId: string;
+  projectName: string;
+  /**
+   * Servers location pool
+   * @default ru-1
+   * @see https://docs.selectel.ru/control-panel-actions/infrastructure/#selectel-infrastructure
+   */
+  pool?: Pool;
 }
 
 export interface CreateContainerParams extends RequiredParams {
@@ -99,7 +107,7 @@ export interface AuthorizeReturn {
   token?: string;
 }
 
-export interface GetContainersJsonReturn {
+export interface GetContainersData {
   name: string;
   count: number;
   bytes: number;
@@ -110,14 +118,6 @@ export interface GetContainersJsonReturn {
   last_modified: string;
 }
 
-export interface GetFileReturn {
-  // TODO: add xml file interface when xml will be supported
-  files: string[] | FileObject[];
-  filesAmount: number;
-  containerSize: number;
-  containerType: ContainerType;
-}
-
 export interface DeleteFilesReturn {
   'Number Not Found': number;
   'Response Status': string;
@@ -126,39 +126,44 @@ export interface DeleteFilesReturn {
   'Number Deleted': number;
 }
 
-const prefixUrl = (key: number | string = 'api') => `https://${key}.selcdn.ru`;
+const buildApiUrl = (pool: Pool) => `https://swift.${pool}.storage.selcloud.ru`;
+
+// https://developers.selectel.ru/docs/control-panel/urls/#%D1%81%D0%B0%D0%BD%D0%BA%D1%82-%D0%BF%D0%B5%D1%82%D0%B5%D1%80%D0%B1%D1%83%D1%80%D0%B3
+const authorizationUrl =
+  'https://cloud.api.selcloud.ru/identity/v3/auth/tokens';
 
 export class SelectelStorageClient {
   /**
-   * userId is a public since it is required from outside when we want to cache
-   * token and we have several selectel users in our app
+   * username is a public since it is required from outside when we want to cache
+   * token, and we have several Selectel users in our app
    */
-  public readonly userId: string;
+  public readonly username: string;
   private readonly accountId: string;
   private readonly password: string;
-  private readonly proto: Protocol;
   private readonly storageUrl: string;
-  private numericDomain?: number;
+  private readonly projectId: string;
+  private readonly projectName: string;
   /**
    * Authorization token
    */
   private token?: string;
   private expireAuthToken?: number;
 
-  private static extractAccountId(userId: string): string {
-    return userId.indexOf('_') !== -1 ? userId.split('_')[0] : userId;
-  }
+  constructor(options: Options) {
+    this.username = options.username;
+    this.password = options.password;
+    this.accountId = options.accountId;
+    this.projectId = options.projectId;
+    this.projectName = options.projectName;
+    /**
+     * rename to storageApiUrl
+     */
+    this.storageUrl = `${buildApiUrl(options.pool ?? 'ru-1')}/v1/${
+      this.projectId
+    }`;
+    this.token = options.token;
 
-  constructor(params: Params) {
-    this.userId = params.userId;
-    this.password = params.password;
-    this.proto = params.proto || 3;
-    this.accountId = SelectelStorageClient.extractAccountId(this.userId);
-    this.storageUrl = `${prefixUrl()}/v1/SEL_${this.accountId}`;
-    this.numericDomain = params.numericDomain;
-    this.token = params.token;
-
-    if (!this.userId) {
+    if (!this.username) {
       throw new Error('User is required');
     }
 
@@ -168,24 +173,12 @@ export class SelectelStorageClient {
   }
 
   /**
-   * Account information
-   */
-  public getAccountInfo(): Promise<Response | void> {
-    return this.makeRequest<Response>(this.storageUrl, 'HEAD').catch(
-      handleError,
-    );
-  }
-
-  /**
    * Summary storage information
-   * @todo: this one always returns forbidden. event when call from curl
+   *
+   * @see https://developers.selectel.ru/docs/cloud-services/cloud-storage/storage_swift_api/#%D0%BF%D0%BE%D0%BB%D1%83%D1%87%D0%B8%D1%82%D1%8C-%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D1%8E-%D0%BE-%D1%85%D1%80%D0%B0%D0%BD%D0%B8%D0%BB%D0%B8%D1%89%D0%B5
    */
-  public getInfo(): Promise<Response | void> {
-    return this.getNumericDomain()
-      .then((numericDomain: number) =>
-        this.makeRequest<Response>(prefixUrl(numericDomain), 'HEAD'),
-      )
-      .catch(handleError);
+  public getInfo() {
+    return this.makeRequest<Response<void>>(this.storageUrl, 'HEAD');
   }
 
   //
@@ -195,33 +188,23 @@ export class SelectelStorageClient {
   /**
    * Request could be of two types: with json and with string
    * @param {boolean} returnJson
-   * @returns {Promise<Response | GetContainersJsonReturn | void>}
+   * @returns {Promise<Response | GetContainersData | void>}
    */
-  public getContainers(
-    returnJson = true,
-  ): Promise<Response | GetContainersJsonReturn | void> {
+  public getContainers(returnJson = true) {
     if (returnJson) {
       const searchParams = new URLSearchParams([['format', 'json']]);
-      return this.getNumericDomain()
-        .then((numericDomain: number) =>
-          this.makeRequest<GetContainersJsonReturn>(
-            prefixUrl(numericDomain),
-            'GET',
-            {
-              searchParams,
-              headers: {
-                accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
-              responseType: 'json',
-              resolveBodyOnly: true,
-            },
-          ),
-        )
-        .catch(handleError);
+      return this.makeRequest<GetContainersData>(this.storageUrl, 'GET', {
+        searchParams,
+        headers: {
+          accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        responseType: 'json',
+        resolveBodyOnly: true,
+      });
     }
 
-    return this.makeRequest<Response>(this.storageUrl).catch(handleError);
+    return this.makeRequest<Response<GetContainersData>>(this.storageUrl);
   }
 
   /**
@@ -231,9 +214,7 @@ export class SelectelStorageClient {
    * @param {string} [params.metadata] - additional meta data
    * @returns {Promise<Response | void>}
    */
-  public createContainer(
-    params: CreateContainerParams,
-  ): Promise<Response | void> {
+  public createContainer(params: CreateContainerParams) {
     validateParams(params);
 
     return this.makeRequest<Response>(
@@ -245,7 +226,7 @@ export class SelectelStorageClient {
           'X-Container-Meta-Some': params.metadata || '',
         },
       },
-    ).catch(handleError);
+    );
   }
 
   /**
@@ -253,67 +234,56 @@ export class SelectelStorageClient {
    * @param {string} params.container - Container name
    * @returns {Promise<Response | void>}
    */
-  public getContainerInfo(params: RequiredParams): Promise<Response | void> {
+  public getContainerInfo(params: RequiredParams) {
     validateParams(params);
 
-    return this.makeRequest<Response>(
-      `${this.storageUrl}/${params.container}`,
-    ).catch(handleError);
+    return this.makeRequest<Response>(`${this.storageUrl}/${params.container}`);
   }
 
   /**
    * Get a list of files data
    *
-   * @param params
    * @todo: should we return void here too?
    */
-  public getFiles(params: GetFilesParams): Promise<GetFileReturn> {
-    return Promise.resolve()
-      .then(() => {
-        validateParams(params);
+  public getFiles(params: GetFilesParams) {
+    validateParams(params);
 
-        const searchParams = new URLSearchParams();
+    const searchParams = new URLSearchParams();
 
-        if (typeof params.format === 'string') {
-          searchParams.append('format', params.format);
-        }
+    if (typeof params.format === 'string') {
+      searchParams.append('format', params.format);
+    }
 
-        if (typeof params.limit === 'number') {
-          searchParams.append('limit', params.limit.toString());
-        }
+    if (typeof params.limit === 'number') {
+      searchParams.append('limit', params.limit.toString());
+    }
 
-        if (typeof params.marker === 'string') {
-          searchParams.append('marker', params.marker);
-        }
+    if (typeof params.marker === 'string') {
+      searchParams.append('marker', params.marker);
+    }
 
-        if (typeof params.prefix === 'string') {
-          searchParams.append('prefix', params.prefix);
-        }
+    if (typeof params.prefix === 'string') {
+      searchParams.append('prefix', params.prefix);
+    }
 
-        if (typeof params.delimiter === 'string') {
-          searchParams.append('delimiter', params.delimiter);
-        }
+    if (typeof params.delimiter === 'string') {
+      searchParams.append('delimiter', params.delimiter);
+    }
 
-        return this.makeRequest(
-          `${this.storageUrl}/${params.container}`,
-          'GET',
-          {
-            searchParams,
-          },
-        );
-      })
-      .then((response: Response): GetFileReturn => {
-        const files = parseFiles(response.body, params.format);
+    return this.makeRequest(`${this.storageUrl}/${params.container}`, 'GET', {
+      searchParams,
+    }).then((response: Response) => {
+      const files = parseFiles(response.body, params.format);
 
-        return {
-          files,
-          filesAmount: +response.headers['x-container-object-count'],
-          containerSize: +response.headers['x-container-bytes-used'],
-          containerType: response.headers[
-            'x-container-meta-type'
-          ] as ContainerType,
-        };
-      });
+      return {
+        files,
+        filesAmount: +response.headers['x-container-object-count'],
+        containerSize: +response.headers['x-container-bytes-used'],
+        containerType: response.headers[
+          'x-container-meta-type'
+        ] as ContainerType,
+      };
+    });
   }
 
   //
@@ -329,9 +299,9 @@ export class SelectelStorageClient {
    * @param {Buffer | string} params.file - file's buffer or local path
    * @returns {Promise<Response | void>}
    */
-  public uploadFile(params: UploadFileParams): Promise<Response | void> {
+  public uploadFile(params: UploadFileParams): Promise<Response> {
     return Promise.resolve()
-      .then((): strm.Stream | Promise<strm.Stream> => {
+      .then(() => {
         validateParams(params);
 
         if (typeof params.file === 'string') {
@@ -387,9 +357,7 @@ export class SelectelStorageClient {
    * @param {string[]} params.files - files names
    * @returns {Promise<DeleteFilesReturn | void>}
    */
-  public deleteFiles(
-    params: DeleteFilesParams,
-  ): Promise<DeleteFilesReturn | void> {
+  public deleteFiles(params: DeleteFilesParams) {
     validateParams(params);
     if (!Array.isArray(params.files) || !params.files.length) {
       throw new Error('Files missed');
@@ -415,7 +383,7 @@ export class SelectelStorageClient {
    * @param {string} params.file
    * @returns {Promise<Response | void>} statusCode "204" on success
    */
-  public deleteFile(params: DeleteFileParams): Promise<Response | void> {
+  public deleteFile(params: DeleteFileParams) {
     validateParams(params);
     if (typeof params.file !== 'string') {
       throw new Error('File missed');
@@ -430,159 +398,53 @@ export class SelectelStorageClient {
    * @returns {Promise<{ expire: string, token: string }>} When you want
    * to extend class this could be helpful to memorize token. I.e. to redis
    */
-  protected authorize(): Promise<AuthorizeReturn> {
+  protected authorize() {
     return this.authorizationRequest().then(async (response) => {
       if (response) {
-        switch (this.proto) {
-          case 1: {
-            const expire =
-              parseInt(
-                (response as Response).headers['x-expire-auth-token'] as string,
-                10,
-              ) *
-                1000 +
-              Date.now();
-            this.expireAuthToken = expire;
-            this.token = (response as Response).headers[
-              'x-auth-token'
-            ] as string;
+        const expire = new Date(response[1].token.expires_at).getTime();
+        this.expireAuthToken = expire;
+        this.token = response[0].headers['x-subject-token'] as string;
 
-            return {
-              expire,
-              token: (response as Response).headers['x-auth-token'],
-            };
-          }
-          case 2: {
-            const expire = new Date(
-              (response as AuthorizeJsonResponse).access.token.expires,
-            ).getTime();
-            this.expireAuthToken = expire;
-            this.token = (response as AuthorizeJsonResponse).access.token.id;
-
-            return {
-              expire,
-              token: (response as AuthorizeJsonResponse).access.token.id,
-            };
-          }
-          case 3:
-          default: {
-            const expire = new Date(response[1].token.expires_at).getTime();
-            this.expireAuthToken = expire;
-            this.token = response[0].headers['x-subject-token'] as string;
-
-            return {
-              expire,
-              token: response[0].headers['x-subject-token'],
-            };
-          }
-        }
+        return {
+          expire,
+          token: response[0].headers['x-subject-token'],
+        };
       }
       return {};
     });
   }
 
-  protected loadNumericDomain(): Promise<Response> {
-    return got.get({
-      prefixUrl: prefixUrl('auth'),
-      headers: {
-        'X-Auth-User': this.userId,
-        'X-Auth-Key': this.password,
-      },
-    });
-  }
-
-  private getAuthorizationPath(): string {
-    switch (this.proto) {
-      case 1:
-        return 'auth/v1.0';
-      case 2:
-        return 'v2.0/tokens';
-      case 3:
-      default:
-        return 'v3/auth/tokens';
-    }
-  }
-
   private authorizationRequest(): Promise<
     Response | AuthorizeJsonResponse | [Response, unknown]
   > {
-    // CancelableRequest<unknown> | Request | Promise<[Response<unknown>, unknown]>
-    const url = this.getAuthorizationPath();
-    switch (this.proto) {
-      case 1:
-        return got.get(url, {
-          prefixUrl: prefixUrl(),
-          headers: {
-            'X-Auth-User': this.userId,
-            'X-Auth-Key': this.password,
-          },
-        });
-      case 2:
-        return got.post(url, {
-          prefixUrl: prefixUrl(),
-          headers: {
-            'Content-type': 'application/json',
-          },
-          json: {
-            auth: {
-              passwordCredentials: {
-                username: this.userId,
+    const response = got.post(authorizationUrl, {
+      headers: {
+        'Content-type': 'application/json',
+      },
+      json: {
+        auth: {
+          identity: {
+            methods: ['password'],
+            password: {
+              user: {
+                name: this.username,
+                domain: { name: this.accountId },
                 password: this.password,
               },
             },
           },
-          responseType: 'json',
-          resolveBodyOnly: true,
-        });
-      case 3:
-      default: {
-        const response = got.post(url, {
-          prefixUrl: prefixUrl(),
-          headers: {
-            'Content-type': 'application/json',
-          },
-          json: {
-            auth: {
-              identity: {
-                methods: ['password'],
-                password: {
-                  user: {
-                    id: this.userId,
-                    password: this.password,
-                  },
-                },
-              },
+          scope: {
+            project: {
+              name: this.projectName,
+              domain: { name: this.accountId },
             },
           },
-          responseType: 'json',
-        });
-        // we need both: response and json-body
-        return Promise.all([response, response.json()]);
-      }
-    }
-  }
-
-  private getNumericDomain(): Promise<number | void> {
-    return new Promise((resolve) => {
-      if (typeof this.numericDomain === 'number') {
-        resolve(this.numericDomain);
-      }
-      return this.loadNumericDomain().then((response) => {
-        if (typeof response.headers['x-storage-url'] === 'string') {
-          const numericDomain = +response.headers['x-storage-url']
-            .split('//')[1]
-            .split('.')[0];
-          if (!isNaN(numericDomain)) {
-            this.numericDomain = numericDomain;
-            resolve(numericDomain);
-          } else {
-            throw new Error(
-              'Unable to extract numeric domain from Selectel response headers',
-            );
-          }
-        }
-      });
+        },
+      },
+      responseType: 'json',
     });
+    // we need both: response and json-body
+    return Promise.all([response, response.json()]);
   }
 
   private makeRequest<T>(
@@ -628,16 +490,8 @@ export class SelectelStorageClient {
   }
 }
 
-function handleError(err) {
-  throw new Error(err);
-}
-
 function validateParams<T extends RequiredParams>(params: T) {
-  if (!params) {
-    throw new Error('Params missed');
-  }
-
-  if (typeof params.container !== 'string' || !params.container.length) {
+  if (typeof params?.container !== 'string' || !params?.container.length) {
     throw new Error('Container name missed');
   }
 }

@@ -1,5 +1,14 @@
 # Change Log
 
+# [0.7.0] - 2024-05-10
+
+BREAKING CHANGES:
+
+- delete `getAccountInfo` method
+- remove option `proto`
+- rename option `userId` to `username`
+- introduce `pool` option which is described here https://docs.selectel.ru/control-panel-actions/infrastructure/#selectel-infrastructure
+
 # [0.6.3] - 2021-08-22
 
 - bump `got` to 11 stable

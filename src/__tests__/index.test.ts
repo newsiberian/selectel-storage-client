@@ -11,48 +11,17 @@ dotenv.config();
 const readFile = util.promisify(fs.readFile);
 
 describe('Authorization', () => {
-  it('should receive token via protocol v1.0 authorization', () => {
+  it('should receive token Keystone', () => {
     expect.assertions(2);
     const client = new SelectelStorageClient({
-      userId: process.env.USER_ID,
+      accountId: process.env.ACCOUNT_ID,
+      username: process.env.USER_ID,
       password: process.env.PASSWORD,
-      proto: 1,
+      projectId: process.env.PROJECT_ID,
+      projectName: process.env.PROJECT_NAME,
     });
 
-    return client
-      .getAccountInfo()
-      .then((response) => {
-        expect(response).toBeDefined();
-        expect((response as Response).statusCode).toBe(204);
-      })
-      .catch((err) => {
-        console.error(err);
-      });
-  });
-
-  it('should receive token via protocol v2.0 authorization', () => {
-    expect.assertions(2);
-    const client = new SelectelStorageClient({
-      userId: process.env.USER_ID,
-      password: process.env.PASSWORD,
-      proto: 2,
-    });
-
-    return client.getAccountInfo().then((response) => {
-      expect(response).toBeDefined();
-      expect((response as Response).statusCode).toBe(204);
-    });
-  });
-
-  it('should receive token via protocol v3 authorization', () => {
-    expect.assertions(2);
-    const client = new SelectelStorageClient({
-      userId: process.env.USER_ID,
-      password: process.env.PASSWORD,
-      proto: 3,
-    });
-
-    return client.getAccountInfo().then((response) => {
+    return client.getInfo().then((response) => {
       expect(response).toBeDefined();
       expect((response as Response).statusCode).toBe(204);
     });
@@ -60,39 +29,31 @@ describe('Authorization', () => {
 });
 
 describe('Methods', () => {
-  let client;
+  let client: InstanceType<typeof SelectelStorageClient>;
 
   // authorize
   beforeAll(() => {
     client = new SelectelStorageClient({
-      userId: process.env.USER_ID,
+      accountId: process.env.ACCOUNT_ID,
+      username: process.env.USER_ID,
       password: process.env.PASSWORD,
-      proto: 3,
+      projectId: process.env.PROJECT_ID,
+      projectName: process.env.PROJECT_NAME,
     });
 
-    return client.getAccountInfo().then((response) => {
+    return client.getInfo().then((response) => {
       expect(response).toBeDefined();
       expect(response.statusCode).toBe(204);
     });
   });
 
-  describe('getAccountInfo', () => {
-    it('should return status 204', () => {
-      expect.assertions(4);
-      return client.getAccountInfo().then((response) => {
-        expect(response).toBeDefined();
-        expect(response.statusCode).toBe(204);
-      });
-    });
-  });
-
   describe('getInfo', () => {
-    it('should return status 204', () => {
-      expect.assertions(2);
-      return client.getInfo().then((response) => {
-        expect(response).toBeDefined();
-        expect(response.statusCode).toBe(204);
-      });
+    it('should return status 204', async () => {
+      expect.assertions(4);
+      const response = await client.getInfo();
+
+      expect(response).toBeDefined();
+      expect(response.statusCode).toBe(204);
     });
   });
 
@@ -113,10 +74,11 @@ describe('Methods', () => {
         expect(response).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
-              name: expect.any(String),
-              count: expect.any(Number),
               bytes: expect.any(Number),
-              type: expect.any(String),
+              count: expect.any(Number),
+              last_modified: expect.any(String),
+              name: expect.any(String),
+              storage_policy_index: expect.any(Number),
             }),
           ]),
         );
@@ -150,19 +112,10 @@ describe('Methods', () => {
         });
     });
 
-    it('should throw when params object missed', () => {
-      expect.assertions(1);
-      try {
-        client.createContainer();
-      } catch (err) {
-        expect(err).toEqual(new Error('Params missed'));
-      }
-    });
-
     it('should throw when container name missed', () => {
       expect.assertions(1);
       try {
-        client.createContainer({});
+        client.createContainer({container: undefined});
       } catch (err) {
         expect(err).toEqual(new Error('Container name missed'));
       }
@@ -187,14 +140,14 @@ describe('Methods', () => {
         })
         .then((response) => {
           expect(response).toBeDefined();
-          expect(response.statusCode).toBe(204);
+          expect(String(response.statusCode)).toMatch(/^200|204$/);
         });
     });
 
     it('should throw when container name missed', () => {
       expect.assertions(1);
       try {
-        client.getContainerInfo({});
+        client.getContainerInfo({container: undefined});
       } catch (err) {
         expect(err).toEqual(new Error('Container name missed'));
       }
@@ -346,7 +299,7 @@ describe('Methods', () => {
       expect.assertions(2);
       return client
         .deleteFiles({
-          container: 'logos',
+          container,
           files: ['image-1.png', 'image-2.png', 'image-3.png'],
         })
         .then((response) => {
