@@ -237,6 +237,21 @@ describe('Methods', () => {
         });
     });
 
+    it('should upload file within a folder', () => {
+      expect.assertions(2);
+
+      return client
+        .uploadFile({
+          container: `${container}/new-folder`,
+          file: path.resolve(__dirname, 'image.png'),
+          fileName: 'image.png',
+        })
+        .then((response) => {
+          expect(response).toBeDefined();
+          expect(response.statusCode).toBe(201);
+        });
+    });
+
     it('should upload file from buffer', async () => {
       expect.assertions(2);
 
