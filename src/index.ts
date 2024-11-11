@@ -290,6 +290,34 @@ export class SelectelStorageClient {
   // Single file operations
   //
 
+
+  /**
+   * Get a file info from headers
+   * @param {string} params.container - Container name
+   * @returns {
+   *  Promise<{
+   *    'content-length': string,
+   *    'content-type': string,
+   *  }>
+   * }
+   */
+  public getFileInfo(params: RequiredParams) {
+    validateParams(params);
+
+    const searchParams = new URLSearchParams();
+
+    return this.makeRequest(`${this.storageUrl}/${params.container}`, 'HEAD', {
+      searchParams,
+    }).then((response: Response) => {
+      console.log('response.headers', response.headers)
+
+      return {
+        'content-length': +response.headers['content-length'],
+        'content-type': response.headers['content-type'],
+      } as const;
+    });
+  }
+  
   /**
    * Upload single file to Selectel storage
    * @param {object} params

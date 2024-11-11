@@ -12,7 +12,7 @@
     "noUnusedParameters": false,
     "noUnusedLocals": true,
     "pretty": true,
-    "removeComments": true,
+    "removeComments": false,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "skipLibCheck": true,
