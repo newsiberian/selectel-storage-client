@@ -1,7 +1,3 @@
-selectel-storage-client fork
-
-# Original newsiberian(https://github.com/newsiberian) README:
-
 # selectel-storage-client [![npm version](https://badge.fury.io/js/selectel-storage-client.svg)](https://badge.fury.io/js/selectel-storage-client)
 Another client implementation for Selectel storage API.
 
