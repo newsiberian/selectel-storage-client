@@ -309,8 +309,6 @@ export class SelectelStorageClient {
     return this.makeRequest(`${this.storageUrl}/${params.container}`, 'HEAD', {
       searchParams,
     }).then((response: Response) => {
-      console.log('response.headers', response.headers)
-
       return {
         'content-length': +response.headers['content-length'],
         'content-type': response.headers['content-type'],
