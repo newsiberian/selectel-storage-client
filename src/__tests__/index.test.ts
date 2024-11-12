@@ -211,6 +211,36 @@ describe('Methods', () => {
     });
   });
 
+  describe('getFilesInfo', () => {
+    let container;
+    let filePath;
+
+    beforeAll(() => {
+      const fileName = `image.png`
+      container = faker.name.firstName();
+      filePath = `${container}/${fileName}`
+
+      return client
+        .createContainer({
+          container,
+        })
+        .then(() => {
+          return client.uploadFile({
+            container,
+            file: path.resolve(__dirname, fileName),
+            fileName: fileName,
+          })
+        });
+    });
+
+    it('should receive file size in bytes from container', () => {
+      expect.assertions(1);
+      return client.getFileInfo({ container: filePath }).then((result) => {
+        expect(result['content-length']).toEqual(54555)
+      });
+    });
+  });
+
   describe('uploadFile', () => {
     let container;
 
